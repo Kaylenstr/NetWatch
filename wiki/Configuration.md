@@ -11,9 +11,9 @@ Located in the project root. Format:
     {
       "name": "gateway",
       "host": "192.168.1.1",
-      "location": "Amsterdam, NL",
-      "lat": 52.37,
-      "lon": 4.89,
+      "location": "Brussels, BE",
+      "lat": 50.85,
+      "lon": 4.35,
       "role": "Gateway"
     }
   ]

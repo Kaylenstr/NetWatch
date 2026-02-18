@@ -1,40 +1,41 @@
 # Push to GitHub and Docker Hub
 
-This file explains how to publish. Delete it before pushing if you prefer.
+Git is initialized and the initial commit is done. Complete the push with the commands below.
 
 ## GitHub
 
-**Option A: This folder is your repo**
+Replace `YOUR_USERNAME` and `YOUR_REPO` with your GitHub username and repo name.
 
 ```bash
 cd release
-git init
-git remote add origin https://github.com/yourusername/your-repo.git
-git add .
-git commit -m "Initial release"
+git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git push -u origin main
 ```
 
-**Option B: Copy into existing repo**
-
-Copy all files from `release/` (except this file) into your repo root, then:
+If the repo uses `master` instead of `main`:
 
 ```bash
-git add .
-git commit -m "Release"
-git push
+git branch -M master
+git push -u origin master
+```
+
+## Docker Hub
+
+Replace `YOUR_DOCKERHUB_USER` with your Docker Hub username. Run `docker login` first if needed.
+
+```bash
+cd release
+docker build -t YOUR_DOCKERHUB_USER/netwatch:latest .
+docker push YOUR_DOCKERHUB_USER/netwatch:latest
+```
+
+The image is already built locally as `netwatch:latest`. To push that:
+
+```bash
+docker tag netwatch:latest YOUR_DOCKERHUB_USER/netwatch:latest
+docker push YOUR_DOCKERHUB_USER/netwatch:latest
 ```
 
 ## GitHub Wiki
 
-The `wiki/` folder contains markdown for wiki pages. On GitHub: repo → Wiki → create each page, paste content from the corresponding `.md` file. Start with Home, then Installation, Configuration, Docker.
-
-## Docker Hub
-
-```bash
-docker build -t yourusername/netwatch:latest .
-docker login
-docker push yourusername/netwatch:latest
-```
-
-Replace `yourusername` with your Docker Hub username.
+Copy the contents of each file in `wiki/` to create wiki pages: Home, Installation, Configuration, Docker.

@@ -1,0 +1,11 @@
+services:
+  netwatch:
+    image: ${NETWATCH_IMAGE:-netwatch}
+    build: .
+    container_name: netwatch
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN

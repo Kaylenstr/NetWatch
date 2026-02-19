@@ -6,6 +6,8 @@ Servers loaded from servers.json (auto-detect path).
 
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import subprocess
 import threading
 import platform
@@ -35,19 +37,25 @@ FRONTEND_DIR = find_frontend_dir()
 
 def find_servers_file():
     candidates = [
+        os.path.join(SCRIPT_DIR,   "data", "servers.json"),
+        os.path.join(PROJECT_ROOT, "data", "servers.json"),
         os.path.join(SCRIPT_DIR,   "servers.json"),
         os.path.join(PROJECT_ROOT, "servers.json"),
-        os.path.join(os.getcwd(),  "servers.json"),
     ]
     for path in candidates:
         if os.path.exists(path):
             return path
-    return candidates[1]
+    return candidates[0]
 
 SERVERS_FILE = find_servers_file()
 
 app = Flask(__name__, static_folder=None)
-CORS(app)
+
+# CORS: restrict origins (same-origin + localhost by default; override via CORS_ORIGINS env)
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000")
+CORS(app, origins=[o.strip() for o in _cors_origins.split(",") if o.strip()])
+
+limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["200 per minute"])
 
 @app.route("/")
 @app.route("/settings")
@@ -96,6 +104,17 @@ SERVERS, CONNECTIONS = load_config()
 PING_COUNT = 4
 IS_WINDOWS = platform.system() == "Windows"
 
+# Host validation: alleen geldige hostnames/IPs (geen spaties, newlines, shell chars)
+HOST_PATTERN = re.compile(r"^[a-zA-Z0-9.\-]{1,253}$")
+
+
+def validate_host(host):
+    if not host or not isinstance(host, str):
+        return False
+    host = host.strip()
+    return bool(host and HOST_PATTERN.match(host))
+
+
 metrics = {}
 history = {}
 lock    = threading.Lock()
@@ -105,6 +124,8 @@ for name in SERVERS:
     history[name] = {"timestamps": [], "latency": [], "jitter": []}
 
 def ping_server(host, count=PING_COUNT):
+    if not validate_host(host):
+        return False, None, None
     try:
         if IS_WINDOWS:
             cmd = ["ping", "-n", str(count), "-w", "2000", host]
@@ -194,6 +215,7 @@ def health():
     return jsonify({"status": "ok", "servers": len(SERVERS), "online": online})
 
 @app.route("/api/config", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
 def api_config():
     from flask import request
     if request.method == "GET":
@@ -214,13 +236,15 @@ def api_config():
         for s in servers:
             if not isinstance(s.get("name"), str) or not s.get("name").strip():
                 return jsonify({"error": "Each server must have a name"}), 400
+            if not validate_host(s.get("host", "")):
+                return jsonify({"error": f"Invalid host for server '{s.get('name', '')}'"}), 400
         with open(SERVERS_FILE, "w", encoding="utf-8") as f:
             json.dump({"servers": servers, "connections": connections}, f, indent=2, ensure_ascii=False)
         reload_config()
         return jsonify({"status": "ok", "message": "Config saved"})
     except Exception as e:
         print(f"  Config save failed: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Configuration save failed"}), 500
 
 if __name__ == "__main__":
     t = threading.Thread(target=monitor_loop, daemon=True)

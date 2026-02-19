@@ -1,21 +1,32 @@
 {
-  "connections": [],
+  "connections": [
+    ["gateway", "web"],
+    ["gateway", "db"]
+  ],
   "servers": [
     {
       "name": "gateway",
-      "host": "192.168.1.1",
-      "location": "Antwerp, BE",
-      "lat": 51.22,
-      "lon": 4.4,
+      "host": "10.0.0.1",
+      "location": "Liège, BE",
+      "lat": 50.633,
+      "lon": 5.567,
       "role": "Gateway"
     },
     {
-      "name": "server1",
-      "host": "10.0.0.1",
+      "name": "web",
+      "host": "1.1.1.1",
       "location": "Brussels, BE",
-      "lat": 50.85,
-      "lon": 4.35,
-      "role": "Server"
+      "lat": 50.850,
+      "lon": 4.352,
+      "role": "Web"
+    },
+    {
+      "name": "db",
+      "host": "10.0.0.20",
+      "location": "Antwerp, BE",
+      "lat": 51.219,
+      "lon": 4.402,
+      "role": "Database"
     }
   ]
 }

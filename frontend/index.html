@@ -299,6 +299,16 @@ header {
   height: 100%;
 }
 
+#ping-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 450;
+  pointer-events: none;
+}
+
 .leaflet-container { background: var(--bg); }
 .leaflet-control-scale-line { background: var(--surface) !important; border-color: var(--border) !important; color: var(--text-muted) !important; }
 
@@ -351,6 +361,10 @@ header {
 @keyframes ring-out {
   0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 0.8; }
   100% { transform: translate(-50%,-50%) scale(2.8); opacity: 0; }
+}
+@keyframes offline-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.2; }
 }
 
 /* Popup */
@@ -552,6 +566,7 @@ header {
 
   <main class="map-area">
     <div id="map"></div>
+    <canvas id="ping-canvas"></canvas>
     <div class="map-legend" id="map-legend">
       <div class="map-legend-row">
         <span class="map-legend-dot"></span>
@@ -609,15 +624,15 @@ header {
         <button type="button" class="btn btn-danger" data-action="remove">Remove</button>
       </div>
       <div class="settings-row row-2">
-        <label><span>Name</span><input type="text" name="name" placeholder="server1" required></label>
+        <label><span>Name</span><input type="text" name="name" placeholder="proxy" required></label>
         <label><span>Host</span><input type="text" name="host" placeholder="192.168.1.1" required></label>
       </div>
       <div class="settings-row">
-        <label><span>Location</span><input type="text" name="location" placeholder="Brussels, BE"></label>
+        <label><span>Location</span><input type="text" name="location" placeholder="Amsterdam, NL"></label>
       </div>
       <div class="settings-row">
-        <label class="input-sm"><span>Lat</span><input type="number" step="0.0001" name="lat" placeholder="50.85"></label>
-        <label class="input-sm"><span>Lon</span><input type="number" step="0.0001" name="lon" placeholder="4.35"></label>
+        <label class="input-sm"><span>Lat</span><input type="number" step="0.0001" name="lat" placeholder="52.37"></label>
+        <label class="input-sm"><span>Lon</span><input type="number" step="0.0001" name="lon" placeholder="4.89"></label>
       </div>
       <div class="settings-row">
         <label><span>Role</span><input type="text" name="role" placeholder="Gateway"></label>
@@ -742,7 +757,7 @@ function updateSidebar(metrics) {
   serverOrder.forEach(name => {
     const m = metrics[name];
     if (!m) return;
-    const color  = serverColors[name] || '#fff';
+    const sc     = statusColor(m);
     const online = m.online;
     const badge  = online ? 'online' : 'offline';
 
@@ -754,7 +769,7 @@ function updateSidebar(metrics) {
       list.appendChild(card);
     }
 
-    card.style.borderLeftColor = online ? color : 'var(--border)';
+    card.style.borderLeftColor = sc;
     card.innerHTML = `
       <div class="srv-top">
         <div class="srv-info">
@@ -822,12 +837,17 @@ L.control.scale({ imperial: false }).addTo(map);
 
 window.addEventListener('resize', () => map.invalidateSize());
 
-const serverCircles = {};
-
 /* Markers */
-function makeMarkerIcon(color, online) {
-  const dot = online ? color : '#ef4444';
-  const html = `<div style="position:relative;width:12px;height:12px">
+function statusColor(m) {
+  if (!m.online) return '#ef4444';
+  if (m.latency_ms !== null && m.latency_ms > 50) return '#f97316';
+  return '#22c55e';
+}
+
+function makeMarkerIcon(m) {
+  const dot = statusColor(m);
+  const blink = !m.online ? 'animation:offline-blink 1.2s ease-in-out infinite;' : '';
+  const html = `<div style="position:relative;width:12px;height:12px;${blink}">
     <div style="width:12px;height:12px;border-radius:50%;background:${dot}25;border:2px solid ${dot};z-index:2;position:relative"></div>
     <div style="position:absolute;top:50%;left:50%;width:28px;height:28px;border-radius:50%;border:1.5px solid ${dot};opacity:0;animation:ring-out 2.5s ease-out infinite;transform:translate(-50%,-50%)"></div>
   </div>`;
@@ -835,8 +855,7 @@ function makeMarkerIcon(color, online) {
 }
 
 function makePopup(name, m) {
-  const color = serverColors[name] || '#fff';
-  const dot   = m.online ? color : '#ef4444';
+  const dot = statusColor(m);
   return `<div style="font-family:Inter,sans-serif;min-width:200px">
     <div class="popup-name">
       <span class="popup-dot" style="background:${dot}"></span>${name}
@@ -860,11 +879,10 @@ function updateMarkers(metrics) {
   const bounds = [];
   Object.entries(metrics).forEach(([name, m]) => {
     if (!m.lat || !m.lon) return;
-    const color = serverColors[name] || '#fff';
-    const icon  = makeMarkerIcon(color, m.online);
+    const icon = makeMarkerIcon(m);
+    const sc   = statusColor(m);
     bounds.push([m.lat, m.lon]);
 
-    // Marker
     if (leafletMarkers[name]) {
       leafletMarkers[name].setIcon(icon);
       leafletMarkers[name].setPopupContent(makePopup(name, m));
@@ -874,28 +892,6 @@ function updateMarkers(metrics) {
         .addTo(map);
     }
 
-    // Semi-transparent circle (dark mode style, ~100km radius)
-    const fillColor = m.online ? (serverColors[name] || '#84cc16') : '#ef4444';
-    if (serverCircles[name]) {
-      serverCircles[name].setLatLng([m.lat, m.lon]);
-      serverCircles[name].setStyle({ fillColor, color: fillColor });
-    } else {
-      serverCircles[name] = L.circle([m.lat, m.lon], {
-        radius: 100000,
-        fillColor,
-        color: fillColor,
-        fillOpacity: 0.18,
-        weight: 1,
-        opacity: 0.5,
-      }).addTo(map);
-    }
-  });
-
-  Object.keys(serverCircles).forEach(name => {
-    if (!metrics[name]) {
-      map.removeLayer(serverCircles[name]);
-      delete serverCircles[name];
-    }
   });
 
   if (firstLoad && bounds.length > 1) {
@@ -999,6 +995,232 @@ setInterval(() => {
 }, 1000);
 document.getElementById('clock').textContent = new Date().toLocaleTimeString('en');
 
+/* ═══════════════════════════════════════════════════════
+   Ping/Pong Visual — canvas overlay on Leaflet map
+   ═══════════════════════════════════════════════════════ */
+const pingVis = (function() {
+  const canvas = document.getElementById('ping-canvas');
+  const ctx = canvas.getContext('2d');
+
+  const TRAIL_SPEED   = 0.02;
+  const FADE_SPEED    = 0.025;
+  const ARC_HEIGHT    = 0.30;
+  const PING_COLOR    = '#22c55e';
+  const PONG_COLOR    = '#06b6d4';
+
+  let trails = [];
+  let ghosts = {};
+  let prevOnline = {};
+  let hubName = null;
+  let running = false;
+
+  function resizeCanvas() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width  = rect.width  * devicePixelRatio;
+    canvas.height = rect.height * devicePixelRatio;
+    canvas.style.width  = rect.width  + 'px';
+    canvas.style.height = rect.height + 'px';
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  }
+
+  function serverToPixel(name, metrics) {
+    const m = metrics[name];
+    if (!m || !m.lat || !m.lon) return null;
+    const mapEl = document.getElementById('map');
+    const mapRect = mapEl.getBoundingClientRect();
+    const canvasRect = canvas.parentElement.getBoundingClientRect();
+    const pt = map.latLngToContainerPoint([m.lat, m.lon]);
+    return { x: pt.x + (mapRect.left - canvasRect.left), y: pt.y + (mapRect.top - canvasRect.top) };
+  }
+
+  function findHub(metrics) {
+    const names = Object.keys(metrics);
+    const gateway = names.find(n => (metrics[n].role || '').toLowerCase() === 'gateway');
+    if (gateway) return gateway;
+    if (metrics['hub']) return 'hub';
+    return names[0] || null;
+  }
+
+  function ctrlPoint(from, to) {
+    const mx = (from.x + to.x) / 2;
+    const my = (from.y + to.y) / 2;
+    const d  = Math.hypot(to.x - from.x, to.y - from.y);
+    if (d === 0) return { x: mx, y: my - 40 };
+    const px = -(to.y - from.y) / d;
+    const py =  (to.x - from.x) / d;
+    return { x: mx + px * d * ARC_HEIGHT, y: my + py * d * ARC_HEIGHT - d * ARC_HEIGHT * 0.4 };
+  }
+
+  function bezier(t, a, c, b) {
+    const u = 1 - t;
+    return { x: u*u*a.x + 2*u*t*c.x + t*t*b.x, y: u*u*a.y + 2*u*t*c.y + t*t*b.y };
+  }
+
+  function drawArc(from, ctrl, to, maxT, color, width, alpha) {
+    if (maxT <= 0 || alpha <= 0) return;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.globalAlpha = alpha;
+    ctx.lineCap = 'round';
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = color;
+    ctx.beginPath();
+    const steps = 30;
+    const s = bezier(0, from, ctrl, to);
+    ctx.moveTo(s.x, s.y);
+    for (let i = 1; i <= steps; i++) {
+      const t = Math.min((i / steps) * maxT, maxT);
+      const p = bezier(t, from, ctrl, to);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawHead(pos, color, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 14);
+    g.addColorStop(0, color);
+    g.addColorStop(0.5, color + '80');
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function firePings(metrics) {
+    hubName = findHub(metrics);
+    if (!hubName) return;
+    const hubPx = serverToPixel(hubName, metrics);
+    if (!hubPx) return;
+
+    Object.keys(metrics).forEach(name => {
+      if (name === hubName) return;
+      const px = serverToPixel(name, metrics);
+      if (!px) return;
+      const ctrl = ctrlPoint(hubPx, px);
+      trails.push({
+        from: {...hubPx}, to: {...px}, ctrl,
+        type: 'ping', server: name,
+        progress: 0, opacity: 1, state: 'flying'
+      });
+    });
+
+    Object.keys(metrics).forEach(name => {
+      const online = metrics[name].online;
+      if (online && !prevOnline[name]) {
+        delete ghosts[name];
+      }
+      if (!online && name !== hubName) {
+        if (!ghosts[name]) {
+          ghosts[name] = { since: Date.now() };
+        }
+      } else {
+        delete ghosts[name];
+      }
+      prevOnline[name] = online;
+    });
+  }
+
+  function animate(metrics) {
+    resizeCanvas();
+    ctx.clearRect(0, 0, canvas.width / devicePixelRatio, canvas.height / devicePixelRatio);
+
+    if (!hubName) return;
+    const hubPx = serverToPixel(hubName, metrics);
+    if (!hubPx) return;
+
+    Object.entries(ghosts).forEach(([name, ghost]) => {
+      const px = serverToPixel(name, metrics);
+      if (!px) return;
+      const age = Date.now() - ghost.since;
+      let color, width, alpha;
+      if (age < 30000)      { color = '#666'; width = 1.5; alpha = 0.35; }
+      else if (age < 60000) { color = '#ff8800'; width = 2.5; alpha = 0.5; }
+      else {
+        color = '#ff3333';
+        width = 3 + Math.min((age - 60000) / 30000, 2);
+        const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 400);
+        alpha = 0.4 + pulse * 0.5;
+      }
+      const ctrl = ctrlPoint(hubPx, px);
+      ctx.save();
+      ctx.setLineDash([8, 8]);
+      ctx.lineDashOffset = -Date.now() / 60;
+      drawArc(hubPx, ctrl, px, 1, color, width, alpha);
+      ctx.restore();
+    });
+
+    trails = trails.filter(t => {
+      const from = t.from, to = t.to, ctrl = t.ctrl;
+      if (t.state === 'flying') {
+        t.progress += TRAIL_SPEED;
+        if (t.progress >= 1) {
+          t.progress = 1;
+          t.state = 'arrived';
+        }
+      }
+      if (t.state === 'arrived') {
+        if (t.type === 'ping' && metrics[t.server]?.online) {
+          const srvPx = serverToPixel(t.server, metrics);
+          if (srvPx && hubPx) {
+            const pongCtrl = ctrlPoint(srvPx, hubPx);
+            trails.push({
+              from: {...srvPx}, to: {...hubPx}, ctrl: pongCtrl,
+              type: 'pong', server: t.server,
+              progress: 0, opacity: 1, state: 'flying'
+            });
+          }
+        }
+        t.state = 'fading';
+      }
+      if (t.state === 'fading') {
+        t.opacity -= FADE_SPEED;
+      }
+      if (t.opacity <= 0) return false;
+
+      const color = t.type === 'ping' ? PING_COLOR : PONG_COLOR;
+      const w = t.type === 'ping' ? 2.5 : 2;
+      drawArc(from, ctrl, to, Math.min(t.progress, 1), color, w, t.opacity * 0.6);
+
+      if (t.state === 'flying') {
+        const hp = bezier(t.progress, from, ctrl, to);
+        drawHead(hp, color, t.opacity);
+      }
+      return true;
+    });
+  }
+
+  let lastMetrics = {};
+  function setMetrics(m) { lastMetrics = m; }
+
+  function loop() {
+    animate(lastMetrics);
+    requestAnimationFrame(loop);
+  }
+
+  function start() {
+    if (running) return;
+    running = true;
+    resizeCanvas();
+    loop();
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  map.on('move zoom resize', resizeCanvas);
+
+  return { firePings, setMetrics, start };
+})();
+
 async function refresh() {
   const { metrics, history } = await fetchData();
 
@@ -1011,12 +1233,17 @@ async function refresh() {
     updateSidebar(metrics);
     updateHeader(metrics);
     initCharts(history);
+    pingVis.setMetrics(metrics);
+    pingVis.start();
+    pingVis.firePings(metrics);
     firstLoad = false;
   } else {
     updateMarkers(metrics);
     updateSidebar(metrics);
     updateHeader(metrics);
     updateCharts(history);
+    pingVis.setMetrics(metrics);
+    pingVis.firePings(metrics);
   }
 }
 

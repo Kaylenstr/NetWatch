@@ -1,11 +1,16 @@
 services:
   netwatch:
-    image: ${NETWATCH_IMAGE:-netwatch}
+    image: ${NETWATCH_IMAGE:-netwatch-local}
     build: .
     container_name: netwatch
     restart: unless-stopped
     ports:
       - "5000:5000"
+    volumes:
+      - netwatch-data:/app/data
     cap_add:
       - NET_RAW
       - NET_ADMIN
+
+volumes:
+  netwatch-data:

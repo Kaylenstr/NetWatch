@@ -30,19 +30,15 @@ docker run -p 5000:5000 yourusername/netwatch:latest
 
 ## Persisting servers.json
 
-By default, `servers.json` lives inside the container. Changes made via the UI are lost when the container is recreated.
+Server configuration is automatically persisted via a Docker named volume (`netwatch-data`).
 
-To persist:
+On first start, the default `servers.json` is copied to the volume. Changes made via the Settings UI are saved to the volume and survive container rebuilds.
 
-1. Add a volume to `docker-compose.yml`:
+To reset to default configuration:
 
-```yaml
-services:
-  netwatch:
-    volumes:
-      - ./servers.json:/app/servers.json
+```bash
+docker compose down -v
+docker compose up -d
 ```
 
-2. Ensure `servers.json` exists on the host before starting.
-
-Note: On Windows with Docker Desktop, volume paths can sometimes cause issues. If the container fails to start, remove the volume and use the built-in config.
+The `-v` flag removes the data volume, so the next start copies the default config again.

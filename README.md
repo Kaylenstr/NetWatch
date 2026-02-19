@@ -1,7 +1,8 @@
 # NetWatch
 
 Network monitoring dashboard. Pings servers, displays latency and jitter on a map and in charts. Add or edit servers via the built-in settings UI.
-<img width="1914" height="936" alt="example" src="https://github.com/user-attachments/assets/8b2512b4-25bf-44e5-8ca1-30cb7a1492a6" />
+<img width="1916" height="991" alt="example" src="https://github.com/user-attachments/assets/e793409a-5c55-42bf-a5fc-1445e9ae5cfb" />
+
 
 
 ## Requirements

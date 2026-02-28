@@ -517,6 +517,135 @@ header {
 .settings-server .btn-danger { padding: 6px 10px; font-size: 11px; }
 .nav-link { color: var(--blue); text-decoration: none; font-size: 13px; font-weight: 600; }
 .nav-link:hover { color: #60a5fa; }
+
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 15, 20, 0.8);
+}
+.login-overlay.hidden { display: none; }
+.login-modal {
+  width: min(420px, calc(100vw - 32px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.55);
+}
+.login-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.login-modal h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+.login-modal p {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+#login-form {
+  display: flex;
+  gap: 10px;
+}
+#login-password {
+  flex: 1;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-sub);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+}
+#login-password:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+.login-error {
+  margin-top: 10px;
+  color: var(--red);
+  font-size: 12px;
+}
+.login-error.hidden { display: none; }
+
+.setup-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 15, 20, 0.92);
+}
+.setup-screen.hidden { display: none; }
+.setup-card {
+  width: min(520px, calc(100vw - 32px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 22px 55px rgba(0,0,0,.6);
+}
+.setup-title {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.setup-subtitle {
+  margin: 0 0 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.setup-row { margin-bottom: 12px; }
+.setup-row label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-subtle);
+  margin-bottom: 6px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.setup-row input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-sub);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+}
+.setup-row input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+.setup-strength {
+  font-size: 12px;
+  margin-top: -2px;
+  margin-bottom: 12px;
+}
+.setup-strength.bad { color: var(--red); }
+.setup-strength.warn { color: var(--orange); }
+.setup-strength.good { color: var(--green); }
+.setup-msg {
+  font-size: 12px;
+  min-height: 18px;
+  margin-top: 10px;
+  color: var(--text-muted);
+}
+.setup-msg.error { color: var(--red); }
+.setup-msg.success { color: var(--green); }
 </style>
 </head>
 <body>
@@ -606,6 +735,10 @@ header {
   </div>
 
   <div id="settings-page">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0;color:var(--text);letter-spacing:0.04em">Settings</h2>
+      <button id="btn-logout" class="btn btn-ghost">Logout</button>
+    </div>
     <div class="settings-section">
       <h2>Servers</h2>
       <div class="settings-servers-grid" id="settings-servers"></div>
@@ -625,7 +758,7 @@ header {
       </div>
       <div class="settings-row row-2">
         <label><span>Name</span><input type="text" name="name" placeholder="proxy" required></label>
-        <label><span>Host</span><input type="text" name="host" placeholder="192.168.1.1" required></label>
+        <label><span>Host</span><input type="text" name="host" placeholder="host.example.internal" required></label>
       </div>
       <div class="settings-row">
         <label><span>Location</span><input type="text" name="location" placeholder="Amsterdam, NL"></label>
@@ -640,13 +773,173 @@ header {
     </div>
   </template>
 
+  <div id="login-overlay" class="login-overlay hidden">
+    <div class="login-modal">
+      <div class="login-logo">
+        <svg width="24" height="24" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="3" fill="white"/>
+          <circle cx="8" cy="8" r="6.5" stroke="white" stroke-width="1.5" stroke-dasharray="3 2"/>
+        </svg>
+        <span>NetWatch</span>
+      </div>
+      <h2>Settings access</h2>
+      <p>Enter your admin password to manage configuration.</p>
+      <form id="login-form" autocomplete="off">
+        <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" />
+        <button type="submit" id="login-btn" class="btn btn-primary">Unlock</button>
+      </form>
+      <div id="login-error" class="login-error hidden"></div>
+    </div>
+  </div>
+
+  <div id="setup-screen" class="setup-screen hidden">
+    <div class="setup-card">
+      <div class="login-logo" style="margin-bottom:14px">
+        <svg width="24" height="24" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="3" fill="white"/>
+          <circle cx="8" cy="8" r="6.5" stroke="white" stroke-width="1.5" stroke-dasharray="3 2"/>
+        </svg>
+        <span>NetWatch</span>
+      </div>
+      <h1 class="setup-title">Welcome to NetWatch</h1>
+      <p class="setup-subtitle">Create an admin password to get started.</p>
+      <form id="setup-form" autocomplete="off">
+        <div class="setup-row">
+          <label for="setup-password">Password</label>
+          <input id="setup-password" type="password" minlength="12" required autocomplete="new-password" />
+        </div>
+        <div id="setup-strength" class="setup-strength bad">Too short</div>
+        <div class="setup-row">
+          <label for="setup-confirm">Confirm password</label>
+          <input id="setup-confirm" type="password" minlength="12" required autocomplete="new-password" />
+        </div>
+        <button id="setup-submit" type="submit" class="btn btn-primary">Create account</button>
+        <div id="setup-msg" class="setup-msg"></div>
+      </form>
+    </div>
+  </div>
+
 </div>
 
 <script>
+(async function() {
+async function getSetupStatus() {
+  const apiUrl = window.location.protocol === 'file:' ? 'http://localhost:5000' : '';
+  const r = await fetch(apiUrl + '/api/setup/status', { cache: 'no-store' });
+  if (!r.ok) return { setup_required: false };
+  return r.json();
+}
+
+function passwordStrengthLabel(value) {
+  if (!value || value.length < 12) return { text: 'Too short', cls: 'bad' };
+  const hasLower = /[a-z]/.test(value);
+  const hasUpper = /[A-Z]/.test(value);
+  const hasNumber = /\d/.test(value);
+  const hasSpecial = /[^A-Za-z0-9]/.test(value);
+  const veryLongPassphrase = value.length >= 20 && /[A-Za-z]/.test(value) && (hasNumber || /\s/.test(value));
+  const strongMix = (hasUpper && hasLower && hasNumber && hasSpecial) || veryLongPassphrase;
+  if (strongMix) return { text: 'Strong', cls: 'good' };
+  return { text: 'Weak', cls: 'warn' };
+}
+
+function showSetupWizard() {
+  document.querySelector('header')?.style.setProperty('display', 'none');
+  document.getElementById('dashboard')?.style.setProperty('display', 'none');
+  document.getElementById('settings-page')?.style.setProperty('display', 'none');
+  document.getElementById('login-overlay')?.classList.add('hidden');
+
+  const screen = document.getElementById('setup-screen');
+  const form = document.getElementById('setup-form');
+  const pass = document.getElementById('setup-password');
+  const confirm = document.getElementById('setup-confirm');
+  const submit = document.getElementById('setup-submit');
+  const msg = document.getElementById('setup-msg');
+  const strength = document.getElementById('setup-strength');
+  const apiUrl = window.location.protocol === 'file:' ? 'http://localhost:5000' : '';
+
+  function setMessage(text, type = '') {
+    msg.textContent = text;
+    msg.className = 'setup-msg' + (type ? ' ' + type : '');
+  }
+
+  function validateInline() {
+    const strengthState = passwordStrengthLabel(pass.value);
+    strength.textContent = strengthState.text;
+    strength.className = 'setup-strength ' + strengthState.cls;
+    if (confirm.value && pass.value !== confirm.value) {
+      setMessage('Passwords do not match.', 'error');
+      return false;
+    }
+    if (pass.value && pass.value.length < 12) {
+      setMessage('Password must be at least 12 characters.', 'error');
+      return false;
+    }
+    setMessage('');
+    return true;
+  }
+
+  pass.addEventListener('input', validateInline);
+  confirm.addEventListener('input', validateInline);
+  screen.classList.remove('hidden');
+  setTimeout(() => pass.focus(), 0);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!validateInline()) return;
+    submit.disabled = true;
+    submit.textContent = 'Creating...';
+    try {
+      const r = await fetch(apiUrl + '/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pass.value, confirm: confirm.value }),
+      });
+      const raw = await r.text();
+      let data = {};
+      try { data = JSON.parse(raw); } catch {}
+      if (!r.ok) {
+        setMessage(data.error || 'Setup failed.', 'error');
+        return;
+      }
+      setMessage('Setup complete! Loading...', 'success');
+      setTimeout(() => location.reload(), 700);
+    } catch {
+      setMessage('Connection error during setup.', 'error');
+    } finally {
+      submit.disabled = false;
+      submit.textContent = 'Create account';
+    }
+  });
+}
+
+function hideSetupWizard() {
+  const screen = document.getElementById('setup-screen');
+  if (screen) screen.classList.add('hidden');
+  const header = document.querySelector('header');
+  if (header) header.style.display = '';
+  const dashboard = document.getElementById('dashboard');
+  if (dashboard) dashboard.style.display = '';
+}
+
+try {
+  const setupStatus = await getSetupStatus();
+  if (setupStatus.setup_required === true) {
+    showSetupWizard();
+    return;
+  }
+  hideSetupWizard();
+} catch {}
+
 const CONFIG = {
   apiUrl: window.location.protocol === 'file:' ? 'http://localhost:5000' : '',
   refreshMs: 10000,
-  colors: {},
+  colors: {
+    proxy:  '#3b82f6',
+    oberon: '#06b6d4',
+    vault:  '#22c55e',
+    hub:    '#a855f7',
+    tpot:   '#ef4444',
+  },
 };
 
 const PALETTE = [
@@ -661,11 +954,13 @@ let useDemoData  = false;
 let latChart, jitterChart;
 const leafletMarkers = {};
 let demoHistory = {};
+let isAuthenticated = false;
+let csrfToken = '';
 
 const DEMO_SERVERS = {
-  'gateway':  { host:'192.168.1.1',  lat:51.2194, lon:4.4025,  location:'Antwerp, BE', role:'Gateway' },
-  'storage':  { host:'192.168.1.10', lat:50.8503, lon:4.3517,  location:'Brussels, BE', role:'Storage' },
-  'compute':  { host:'192.168.1.20', lat:50.9333, lon:5.3333,  location:'Hasselt, BE',  role:'Compute' },
+  'gateway':  { host:'gateway.internal', lat:51.2194, lon:4.4025, location:'Antwerp, BE', role:'Gateway' },
+  'storage':  { host:'storage.internal', lat:50.8503, lon:4.3517, location:'Brussels, BE', role:'Storage' },
+  'compute':  { host:'compute.internal', lat:50.9333, lon:5.3333, location:'Hasselt, BE', role:'Compute' },
 };
 
 function makeDemoMetrics() {
@@ -709,8 +1004,8 @@ function updateDemoHistory(metrics) {
 async function fetchData() {
   try {
     const [metricsRes, historyRes] = await Promise.all([
-      fetch(CONFIG.apiUrl + '/api/metrics', { signal: AbortSignal.timeout(3000) }),
-      fetch(CONFIG.apiUrl + '/api/history', { signal: AbortSignal.timeout(3000) }),
+      fetch(CONFIG.apiUrl + '/api/metrics', { credentials: 'include', signal: AbortSignal.timeout(3000) }),
+      fetch(CONFIG.apiUrl + '/api/history', { credentials: 'include', signal: AbortSignal.timeout(3000) }),
     ]);
     const metrics = await metricsRes.json();
     const history = await historyRes.json();
@@ -769,13 +1064,14 @@ function updateSidebar(metrics) {
       list.appendChild(card);
     }
 
+    const publicHost = isAuthenticated ? m.host : '••••••••';
     card.style.borderLeftColor = sc;
     card.innerHTML = `
       <div class="srv-top">
         <div class="srv-info">
           <div class="srv-name">${name}</div>
           <div class="srv-sub">${m.location || ''}${m.role ? ' · ' + m.role : ''}</div>
-          <div class="srv-sub" style="font-variant-numeric:tabular-nums">${m.host}</div>
+          <div class="srv-sub" style="font-variant-numeric:tabular-nums">${publicHost}</div>
         </div>
         <span class="status-badge ${badge}">${online ? 'ONLINE' : 'OFFLINE'}</span>
       </div>
@@ -856,13 +1152,14 @@ function makeMarkerIcon(m) {
 
 function makePopup(name, m) {
   const dot = statusColor(m);
+  const publicHost = isAuthenticated ? m.host : '••••••••';
   return `<div style="font-family:Inter,sans-serif;min-width:200px">
     <div class="popup-name">
       <span class="popup-dot" style="background:${dot}"></span>${name}
       ${m.role ? `<span style="font-size:10px;color:var(--text-muted);font-weight:500">${m.role}</span>` : ''}
     </div>
     <div class="popup-grid">
-      <span class="popup-key">Host</span><span class="popup-val">${m.host}</span>
+      <span class="popup-key">Host</span><span class="popup-val">${publicHost}</span>
       <span class="popup-key">Location</span><span class="popup-val">${m.location || '—'}</span>
       <span class="popup-key">Status</span>
         <span class="popup-val" style="color:${m.online ? 'var(--green)':'var(--red)'}">
@@ -1013,6 +1310,7 @@ const pingVis = (function() {
   let prevOnline = {};
   let hubName = null;
   let running = false;
+  let paused = false;
 
   function resizeCanvas() {
     const rect = canvas.parentElement.getBoundingClientRect();
@@ -1204,7 +1502,7 @@ const pingVis = (function() {
   function setMetrics(m) { lastMetrics = m; }
 
   function loop() {
-    animate(lastMetrics);
+    if (!paused) animate(lastMetrics);
     requestAnimationFrame(loop);
   }
 
@@ -1215,13 +1513,21 @@ const pingVis = (function() {
     loop();
   }
 
+  function setPaused(v) {
+    paused = !!v;
+  }
+
   window.addEventListener('resize', resizeCanvas);
   map.on('move zoom resize', resizeCanvas);
 
-  return { firePings, setMetrics, start };
+  return { firePings, setMetrics, start, setPaused };
 })();
 
 async function refresh() {
+  // Settings view does not need live dashboard updates and can feel sluggish
+  // on some systems when map/charts keep rendering in the background.
+  if (location.hash.startsWith('#/settings')) return;
+
   const { metrics, history } = await fetchData();
 
   if (firstLoad) {
@@ -1253,26 +1559,186 @@ setInterval(refresh, CONFIG.refreshMs);
 (function() {
   const api = CONFIG.apiUrl;
   let settingsData = { servers: [], connections: [] };
+  let routeRunId = 0;
+  const inactivityMinutes = 15;
+  const inactivityMs = inactivityMinutes * 60 * 1000;
+  let inactivityTimer = null;
+  const loginOverlay = document.getElementById('login-overlay');
+  const loginForm = document.getElementById('login-form');
+  const loginPassword = document.getElementById('login-password');
+  const loginButton = document.getElementById('login-btn');
+  const loginError = document.getElementById('login-error');
+  const logoutSettings = document.getElementById('btn-logout');
 
-  function route() {
-    const isSettings = location.hash === '#/settings';
-    const nav = document.getElementById('nav-settings');
-    document.getElementById('dashboard').style.display = isSettings ? 'none' : 'grid';
-    document.getElementById('settings-page').classList.toggle('visible', isSettings);
-    if (isSettings) {
-      nav.href = '#/';
-      nav.textContent = 'Home';
-      loadSettings();
+  function updateLogoutVisibility() {
+    if (!logoutSettings) return;
+    const onSettingsPage = location.hash.startsWith('#/settings');
+    logoutSettings.style.display = onSettingsPage ? 'inline-flex' : 'none';
+  }
+
+  async function fetchCsrfToken() {
+    try {
+      const r = await fetch(api + '/api/csrf-token', {
+        credentials: 'include',
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!r.ok) throw new Error('csrf-failed');
+      const data = await r.json();
+      csrfToken = data.token || '';
+      return csrfToken;
+    } catch {
+      csrfToken = '';
+      return '';
+    }
+  }
+
+  async function checkAuthStatus() {
+    try {
+      const r = await fetch(api + '/api/auth/status', {
+        credentials: 'include',
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!r.ok) throw new Error('auth-status-failed');
+      const data = await r.json();
+      isAuthenticated = data.authenticated === true;
+      updateLogoutVisibility();
+      if (isAuthenticated) resetInactivityTimer();
+    } catch {
+      isAuthenticated = false;
+      updateLogoutVisibility();
+    }
+    return isAuthenticated;
+  }
+
+  function authHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': csrfToken || '',
+    };
+  }
+
+  async function performLogout() {
+    try {
+      if (!csrfToken) await fetchCsrfToken();
+      await fetch(api + '/api/logout', {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+        keepalive: true,
+      });
+    } catch {}
+    isAuthenticated = false;
+    updateLogoutVisibility();
+    if (inactivityTimer) {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = null;
+    }
+    location.hash = '#/';
+    route();
+  }
+
+  async function enforceLogoutOnPageLoad() {
+    try {
+      const authed = await checkAuthStatus();
+      if (!authed) return;
+      if (!csrfToken) await fetchCsrfToken();
+      await fetch(api + '/api/logout', {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+        keepalive: true,
+      });
+      isAuthenticated = false;
+      updateLogoutVisibility();
+    } catch {}
+  }
+
+  function resetInactivityTimer() {
+    if (!isAuthenticated) return;
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      performLogout();
+    }, inactivityMs);
+  }
+
+  function showLoginModal(msg = '') {
+    if (msg) {
+      loginError.textContent = msg;
+      loginError.classList.remove('hidden');
     } else {
-      nav.href = '#/settings';
-      nav.textContent = 'Settings';
-      if (typeof map !== 'undefined') setTimeout(() => map.invalidateSize(), 100);
+      loginError.classList.add('hidden');
+      loginError.textContent = '';
+    }
+    loginOverlay.classList.remove('hidden');
+    loginPassword.value = '';
+    loginButton.disabled = false;
+    loginButton.textContent = 'Unlock';
+    setTimeout(() => loginPassword.focus(), 0);
+  }
+
+  function hideLoginModal() {
+    // Failsafe: keep auth gate visible while on settings and unauthenticated.
+    if (location.hash.startsWith('#/settings') && !isAuthenticated) return;
+    loginOverlay.classList.add('hidden');
+    loginError.classList.add('hidden');
+    loginError.textContent = '';
+  }
+
+  async function route() {
+    const runId = ++routeRunId;
+    try {
+      const isSettings = location.hash.startsWith('#/settings');
+      const nav = document.getElementById('nav-settings');
+
+      if (isSettings) {
+        pingVis.setPaused(true);
+        await fetchCsrfToken();
+        if (runId !== routeRunId) return;
+        const authed = await checkAuthStatus();
+        if (runId !== routeRunId) return;
+        if (!authed) {
+          document.getElementById('dashboard').style.display = 'none';
+          document.getElementById('settings-page').classList.remove('visible');
+          nav.href = '#/';
+          nav.textContent = 'Home';
+          updateLogoutVisibility();
+          showLoginModal();
+          return;
+        }
+        hideLoginModal();
+        document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('settings-page').classList.add('visible');
+        nav.href = '#/';
+        nav.textContent = 'Home';
+        updateLogoutVisibility();
+        await loadSettings();
+        if (runId !== routeRunId) return;
+      } else {
+        pingVis.setPaused(false);
+        hideLoginModal();
+        document.getElementById('dashboard').style.display = 'grid';
+        document.getElementById('settings-page').classList.remove('visible');
+        nav.href = '#/settings';
+        nav.textContent = 'Settings';
+        updateLogoutVisibility();
+        if (typeof map !== 'undefined') setTimeout(() => map.invalidateSize(), 100);
+        refresh();
+      }
+    } catch (e) {
+      document.getElementById('dashboard').style.display = 'grid';
+      document.getElementById('settings-page').classList.remove('visible');
+      showLoginModal('Connection issue while opening settings. Try again.');
     }
   }
 
   async function loadSettings() {
     try {
-      const r = await fetch(api + '/api/config');
+      const r = await fetch(api + '/api/config', { credentials: 'include' });
+      if (r.status === 401) {
+        isAuthenticated = false;
+        showLoginModal('Session expired. Please login again.');
+        return;
+      }
       settingsData = await r.json();
       renderSettings();
     } catch (e) {
@@ -1350,10 +1816,20 @@ setInterval(refresh, CONFIG.refreshMs);
     try {
       const r = await fetch(api + '/api/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ servers, connections }),
       });
       const data = await r.json();
+      if (r.status === 401) {
+        isAuthenticated = false;
+        showLoginModal('Session expired. Please login again.');
+        return;
+      }
+      if (r.status === 403) {
+        status.textContent = 'Security token invalid. Refresh and login again.';
+        return;
+      }
       if (!r.ok) throw new Error(data.error || 'Error');
       status.textContent = 'Saved! Reloading...';
       setTimeout(() => { location.hash = '#/'; location.reload(); }, 500);
@@ -1362,8 +1838,65 @@ setInterval(refresh, CONFIG.refreshMs);
     }
   });
 
-  window.addEventListener('hashchange', route);
-  route();
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const password = loginPassword.value || '';
+    loginButton.disabled = true;
+    loginButton.textContent = 'Checking...';
+    loginError.classList.add('hidden');
+    try {
+      if (!csrfToken) await fetchCsrfToken();
+      const r = await fetch(api + '/api/login', {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ password }),
+      });
+      const data = await r.json();
+      if (r.status === 429) {
+        showLoginModal('Too many attempts, try again later.');
+        loginButton.disabled = true;
+        loginButton.textContent = 'Locked';
+        return;
+      }
+      if (r.status === 403) {
+        await fetchCsrfToken();
+        showLoginModal('Security token mismatch. Try again.');
+        return;
+      }
+      if (!r.ok) {
+        showLoginModal(data.error || 'Incorrect password.');
+        return;
+      }
+      isAuthenticated = true;
+      updateLogoutVisibility();
+      resetInactivityTimer();
+      await fetchCsrfToken();
+      hideLoginModal();
+      await route();
+    } catch {
+      showLoginModal('Connection error. Try again.');
+    } finally {
+      loginButton.disabled = false;
+      loginButton.textContent = 'Unlock';
+      loginPassword.value = '';
+    }
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', async () => { await performLogout(); });
+
+  ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach((eventName) => {
+    window.addEventListener(eventName, () => resetInactivityTimer(), { passive: true });
+  });
+
+  window.addEventListener('hashchange', () => { route(); });
+  updateLogoutVisibility();
+  (async () => {
+    await enforceLogoutOnPageLoad();
+    fetchCsrfToken().catch(() => {});
+    route();
+  })();
+})();
 })();
 </script>
 </body>

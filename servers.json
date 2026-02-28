@@ -1,32 +1,49 @@
 {
   "connections": [
-    ["gateway", "web"],
-    ["gateway", "db"]
+    ["hub", "vault"],
+    ["hub", "proxy"],
+    ["proxy", "oberon"]
   ],
   "servers": [
     {
-      "name": "gateway",
-      "host": "10.0.0.1",
+      "name": "proxy",
+      "host": "135.181.97.91",
+      "location": "Helsinki, FI",
+      "lat": 60.170,
+      "lon": 24.930,
+      "role": "Proxy"
+    },
+    {
+      "name": "oberon",
+      "host": "135.181.217.55",
+      "location": "Helsinki, FI",
+      "lat": 60.185,
+      "lon": 24.955,
+      "role": "Server"
+    },
+    {
+      "name": "vault",
+      "host": "192.168.1.231",
       "location": "Liège, BE",
-      "lat": 50.633,
-      "lon": 5.567,
+      "lat": 50.820,
+      "lon": 5.600,
+      "role": "Storage"
+    },
+    {
+      "name": "hub",
+      "host": "192.168.1.232",
+      "location": "Liège, BE",
+      "lat": 50.835,
+      "lon": 5.635,
       "role": "Gateway"
     },
     {
-      "name": "web",
-      "host": "1.1.1.1",
-      "location": "Brussels, BE",
-      "lat": 50.850,
-      "lon": 4.352,
-      "role": "Web"
-    },
-    {
-      "name": "db",
-      "host": "10.0.0.20",
-      "location": "Antwerp, BE",
-      "lat": 51.219,
-      "lon": 4.402,
-      "role": "Database"
+      "name": "tpot",
+      "host": "45.134.226.241",
+      "location": "Karlsruhe, DE",
+      "lat": 49.007,
+      "lon": 8.404,
+      "role": "Honeypot"
     }
   ]
 }

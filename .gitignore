@@ -1,13 +1,6 @@
-__pycache__/
-*.py[cod]
-*.pyo
-.Python
-.venv/
-venv/
+# Gearchiveerde code (niet in repo)
+archive/
 .env
-.env.*
-*.log
-.DS_Store
-.idea/
-.vscode/
-data/
+__pycache__/
+*.pyc
+cookies.txt

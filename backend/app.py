@@ -114,7 +114,7 @@ ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
 _session_hours = int(os.getenv("SESSION_LIFETIME_HOURS", "8"))
 _inactivity_minutes = int(os.getenv("INACTIVITY_TIMEOUT_MINUTES", "15"))
 _inactivity_seconds = max(60, _inactivity_minutes * 60)
-_session_secure_default = "true" if os.getenv("FLASK_ENV", "production") == "production" else "false"
+_session_secure_default = "false"
 _session_secure = os.getenv("SESSION_COOKIE_SECURE", _session_secure_default).lower() == "true"
 
 app.config.update(

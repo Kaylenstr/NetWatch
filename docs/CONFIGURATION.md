@@ -18,10 +18,9 @@
   - Session expiration window for authenticated users.
 
 - `SESSION_COOKIE_SECURE`
-  - Default:
-    - `true` when `FLASK_ENV=production`
-    - `false` otherwise
-  - Set `true` in production (HTTPS).
+  - Default: `false`
+  - Keep this `false` for HTTP/LAN installs.
+  - Set this to `true` only when the app is served over HTTPS.
 
 - `FLASK_ENV`
   - Default: `production`
@@ -30,6 +29,7 @@
 - `CORS_ORIGINS`
   - Default: `http://localhost:5000,http://127.0.0.1:5000`
   - Comma-separated list of allowed origins.
+  - Add your LAN URL when needed (example: `http://192.168.1.231:5000`).
 
 - `TRUST_PROXY`
   - Default: `false`
@@ -42,9 +42,9 @@
 ADMIN_PASSWORD_HASH=
 SECRET_KEY=
 SESSION_LIFETIME_HOURS=8
-SESSION_COOKIE_SECURE=true
+SESSION_COOKIE_SECURE=false
 FLASK_ENV=production
-CORS_ORIGINS=http://localhost:5000
+CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
 TRUST_PROXY=false
 ```
 
@@ -61,8 +61,6 @@ python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
 ## Startup Behavior
+- First boot without `ADMIN_PASSWORD_HASH` enters setup mode and shows the setup wizard.
 - Application startup fails if:
-  - `SECRET_KEY` is missing or too short
-  - `ADMIN_PASSWORD_HASH` is missing
-
-This fail-fast behavior prevents insecure default deployment.
+  - `SECRET_KEY` is too short while setup is already completed

@@ -1,6 +1,8 @@
 # NetWatch
 
 Modern network monitoring dashboard. Pings servers and displays latency/jitter on maps and charts.
+<img width="1916" height="991" alt="example" src="https://github.com/user-attachments/assets/bc49ff93-5d32-44c7-8195-d3d60f37a763" />
+
 
 ---
 

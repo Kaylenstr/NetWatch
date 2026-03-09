@@ -27,10 +27,10 @@ This builds the image and pushes it to `yourname/netwatch` on Docker Hub.
 ### Step 2 — On each server: one command
 
 ```bash
-NETWATCH_IMAGE=yourname/netwatch curl -fsSL http://your-server/docker-install.sh | bash
+NETWATCH_IMAGE=kaystr/netwatch curl -fsSL https://raw.githubusercontent.com/Kaylenstr/NetWatch/main/docker-install.sh | bash
 ```
 
-That is all. Docker is required on the server:
+Docker required on the server:
 ```bash
 # Install Docker (if not already installed):
 curl -fsSL https://get.docker.com | bash
@@ -40,8 +40,10 @@ curl -fsSL https://get.docker.com | bash
 
 ## Edit servers
 
+Config in `/opt/netwatch/data/` persists across updates.
+
 ```bash
-nano /opt/netwatch/servers.json
+nano /opt/netwatch/data/servers.json
 docker restart netwatch
 ```
 

@@ -25,6 +25,16 @@ echo "✓  Docker found: $(docker --version | cut -d' ' -f3 | tr -d ',')"
 # ── Directory + data (servers.json + .env persistent across updates) ─
 mkdir -p "$DIR/data"
 
+# Before removing: copy data FROM existing container (compose volume or old setup)
+if docker ps -a --format '{{.Names}}' | grep -q '^netwatch$'; then
+  echo "→  Backing up data from existing container..."
+  docker cp netwatch:/app/data/. "$DIR/data/" 2>/dev/null || true
+  if [ -f "$DIR/servers.json" ] && [ ! -f "$DIR/data/servers.json" ]; then
+    cp "$DIR/servers.json" "$DIR/data/servers.json"
+    echo "✓  Migrated from $DIR/servers.json"
+  fi
+fi
+
 if [ ! -f "$DIR/data/servers.json" ]; then
   if [ -f "$DIR/servers.json" ]; then
     cp "$DIR/servers.json" "$DIR/data/servers.json"

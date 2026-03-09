@@ -1,49 +1,41 @@
 {
   "connections": [
-    ["hub", "vault"],
-    ["hub", "proxy"],
-    ["proxy", "oberon"]
+    ["gateway", "storage"],
+    ["gateway", "proxy"],
+    ["proxy", "app"]
   ],
   "servers": [
     {
-      "name": "proxy",
-      "host": "135.181.97.91",
-      "location": "Helsinki, FI",
-      "lat": 60.170,
-      "lon": 24.930,
-      "role": "Proxy"
-    },
-    {
-      "name": "oberon",
-      "host": "135.181.217.55",
-      "location": "Helsinki, FI",
-      "lat": 60.185,
-      "lon": 24.955,
-      "role": "Server"
-    },
-    {
-      "name": "vault",
-      "host": "192.168.1.231",
-      "location": "Liège, BE",
-      "lat": 50.820,
-      "lon": 5.600,
-      "role": "Storage"
-    },
-    {
-      "name": "hub",
-      "host": "192.168.1.232",
-      "location": "Liège, BE",
-      "lat": 50.835,
-      "lon": 5.635,
+      "name": "gateway",
+      "host": "192.0.2.1",
+      "location": "Example, US",
+      "lat": 37.75,
+      "lon": -122.42,
       "role": "Gateway"
     },
     {
-      "name": "tpot",
-      "host": "45.134.226.241",
-      "location": "Karlsruhe, DE",
-      "lat": 49.007,
-      "lon": 8.404,
-      "role": "Honeypot"
+      "name": "storage",
+      "host": "192.0.2.2",
+      "location": "Example, US",
+      "lat": 37.80,
+      "lon": -122.40,
+      "role": "Storage"
+    },
+    {
+      "name": "proxy",
+      "host": "192.0.2.3",
+      "location": "Example, US",
+      "lat": 37.70,
+      "lon": -122.38,
+      "role": "Proxy"
+    },
+    {
+      "name": "app",
+      "host": "192.0.2.4",
+      "location": "Example, US",
+      "lat": 37.78,
+      "lon": -122.44,
+      "role": "Server"
     }
   ]
 }

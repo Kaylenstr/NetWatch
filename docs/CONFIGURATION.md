@@ -29,7 +29,7 @@
 - `CORS_ORIGINS`
   - Default: `http://localhost:5000,http://127.0.0.1:5000`
   - Comma-separated list of allowed origins.
-  - Add your LAN URL when needed (example: `http://192.168.1.231:5000`).
+  - Add your LAN URL when needed (example: `http://192.168.1.100:5000`).
 
 - `TRUST_PROXY`
   - Default: `false`

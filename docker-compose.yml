@@ -10,9 +10,21 @@ services:
       - "5000:5000"
     volumes:
       - netwatch-data:/app/data
+    cap_drop:
+      - ALL
     cap_add:
       - NET_RAW
-      - NET_ADMIN
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
 
 volumes:
   netwatch-data:

@@ -107,7 +107,7 @@ TRUST_PROXY=false
 Important:
 - Keep `SESSION_COOKIE_SECURE=false` for HTTP/LAN installs.
 - Set `SESSION_COOKIE_SECURE=true` only when serving NetWatch over HTTPS.
-- Add your LAN URL to `CORS_ORIGINS` when needed, for example `http://192.168.1.231:5000`.
+- Add your LAN URL to `CORS_ORIGINS` when needed, for example `http://192.168.1.100:5000`.
 - If `ADMIN_PASSWORD_HASH` is empty on first boot, NetWatch starts in setup mode and lets you create credentials.
 
 ### 3) Rebuild/restart container

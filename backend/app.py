@@ -22,6 +22,9 @@ import secrets
 import hmac
 import random
 import bcrypt
+import tempfile
+import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -114,9 +117,11 @@ ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
 _session_hours = int(os.getenv("SESSION_LIFETIME_HOURS", "8"))
 _inactivity_minutes = int(os.getenv("INACTIVITY_TIMEOUT_MINUTES", "15"))
 _inactivity_seconds = max(60, _inactivity_minutes * 60)
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_for=1)
+
 _session_secure_default = "false"
 _session_secure = os.getenv("SESSION_COOKIE_SECURE", _session_secure_default).lower() == "true"
-
 app.config.update(
     SECRET_KEY=_secret_key,
     SESSION_COOKIE_HTTPONLY=True,
@@ -125,13 +130,30 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=_session_hours),
 )
 
-# CORS: restrict origins (same-origin + localhost by default; override via CORS_ORIGINS env)
-_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000")
-CORS(
-    app,
-    origins=[o.strip() for o in _cors_origins.split(",") if o.strip()],
-    supports_credentials=True,
-)
+
+def _behind_proxy():
+    """True when proxy headers present (works with any proxy, VPS or local)."""
+    try:
+        return bool(request.headers.get("X-Forwarded-Proto") or request.headers.get("X-Forwarded-Host"))
+    except Exception:
+        return False
+
+# CORS: restrict origins. When behind proxy, also allow origin derived from X-Forwarded-*.
+# Reject wildcards and validate URL format.
+def _validate_cors_origin(origin):
+    if not isinstance(origin, str) or "*" in origin:
+        return False
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(origin.strip())
+        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+    except Exception:
+        return False
+
+_cors_origins_raw = os.getenv("CORS_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000")
+_cors_origins_list = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
+_cors_origins_valid = [o for o in _cors_origins_list if _validate_cors_origin(o)]
+CORS(app, origins=_cors_origins_valid, supports_credentials=True)
 
 limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["200 per minute"])
 
@@ -250,7 +272,7 @@ SERVERS, CONNECTIONS = load_config()
 PING_COUNT = 4
 IS_WINDOWS = platform.system() == "Windows"
 
-# Host validation: alleen geldige hostnames/IPs (geen spaties, newlines, shell chars)
+# Host validation: valid hostnames/IPs (no spaces, newlines, shell chars)
 HOST_PATTERN = re.compile(r"^[a-zA-Z0-9.\-]{1,253}$")
 
 
@@ -262,19 +284,20 @@ def validate_host(host):
 
 
 def get_client_ip():
-    # Only trust forwarded headers when explicitly enabled behind a trusted proxy.
-    if os.getenv("TRUST_PROXY", "false").lower() == "true":
+    try:
         forwarded = request.headers.get("X-Forwarded-For", "").strip()
         if forwarded:
             return forwarded.split(",")[0].strip()
-    return request.remote_addr or "unknown"
+    except Exception:
+        pass
+    return getattr(request, "remote_addr", None) or "unknown"
 
 
 def security_log(event_name):
-    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
     ip = get_client_ip()
-    ua = (request.headers.get("User-Agent", "") or "").strip()
-    print(f"[SECURITY] {ts} | {event_name} | ip={ip} | ua={ua}")
+    ua = (request.headers.get("User-Agent", "") or "").strip()[:60]
+    print(f"[SEC] {ts} | {event_name} | ip={ip} | ua={ua}"[:200])
 
 
 def is_authenticated():
@@ -328,9 +351,9 @@ def mask_host(host):
 
 def sanitize_public_server(cfg):
     return {
-        "lat": None,
-        "lon": None,
-        "location": "",
+        "lat": cfg.get("lat"),
+        "lon": cfg.get("lon"),
+        "location": "••••••••",
         "host": "••••••••",
         "role": cfg.get("role", ""),
     }
@@ -339,9 +362,9 @@ def sanitize_public_server(cfg):
 def sanitize_public_metric(metric_row, cfg):
     return {
         **metric_row,
-        "lat": None,
-        "lon": None,
-        "location": "",
+        "lat": cfg.get("lat"),
+        "lon": cfg.get("lon"),
+        "location": "••••••••",
         "host": mask_host(cfg.get("host", "")),
         "role": cfg.get("role", ""),
     }
@@ -364,7 +387,7 @@ def ping_server(host, count=PING_COUNT):
         else:
             cmd = ["ping", "-c", str(count), "-W", "2", host]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         output = result.stdout
 
         if IS_WINDOWS:
@@ -385,30 +408,43 @@ def ping_server(host, count=PING_COUNT):
         return False, None, None
 
 def monitor_loop():
+    max_workers = min(4, max(1, (os.cpu_count() or 2) - 1))
     while True:
         items = list(SERVERS.items())
-        for name, cfg in items:
-            online, latency, jitter = ping_server(cfg["host"])
-            now = datetime.now().strftime("%H:%M")
-            with lock:
-                if name not in metrics:
-                    metrics[name] = {"online": False, "latency_ms": None, "jitter_ms": None, "last_checked": None}
-                if name not in history:
-                    history[name] = {"timestamps": [], "latency": [], "jitter": []}
-                metrics[name] = {
-                    "online":       online,
-                    "latency_ms":   latency,
-                    "jitter_ms":    jitter,
-                    "last_checked": now,
-                }
-                h = history[name]
-                h["timestamps"].append(now)
-                h["latency"].append(latency if latency is not None else 0)
-                h["jitter"].append(jitter  if jitter  is not None else 0)
-                if len(h["timestamps"]) > 60:
-                    h["timestamps"].pop(0)
-                    h["latency"].pop(0)
-                    h["jitter"].pop(0)
+        now = datetime.now().strftime("%H:%M")
+        if not items:
+            time.sleep(10)
+            continue
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(ping_server, cfg["host"]): (name, cfg) for name, cfg in items}
+            try:
+                for future in as_completed(futures, timeout=15):
+                    name, cfg = futures[future]
+                    try:
+                        online, latency, jitter = future.result()
+                    except Exception:
+                        online, latency, jitter = False, None, None
+                    with lock:
+                        if name not in metrics:
+                            metrics[name] = {"online": False, "latency_ms": None, "jitter_ms": None, "last_checked": None}
+                        if name not in history:
+                            history[name] = {"timestamps": [], "latency": [], "jitter": []}
+                        metrics[name] = {
+                            "online":       online,
+                            "latency_ms":   latency,
+                            "jitter_ms":    jitter,
+                            "last_checked": now,
+                        }
+                        h = history[name]
+                        h["timestamps"].append(now)
+                        h["latency"].append(latency if latency is not None else 0)
+                        h["jitter"].append(jitter  if jitter  is not None else 0)
+                        if len(h["timestamps"]) > 60:
+                            h["timestamps"].pop(0)
+                            h["latency"].pop(0)
+                            h["jitter"].pop(0)
+            except Exception as e:
+                print(f"  monitor_loop: {e}")
         time.sleep(10)
 
 @app.route("/api/metrics")
@@ -447,6 +483,12 @@ def get_servers():
         "connections": CONNECTIONS,
     })
 
+@app.route("/api/ping")
+def ping():
+    """Minimal endpoint for proxy/debug - no lock, no auth, no deps."""
+    return jsonify({"pong": True})
+
+
 @app.route("/api/health")
 def health():
     online = sum(1 for m in metrics.values() if m.get("online"))
@@ -459,7 +501,7 @@ def setup_gate():
         return None
     if not request.path.startswith("/api/"):
         return None
-    if request.path in ("/api/setup", "/api/setup/status"):
+    if request.path in ("/api/setup", "/api/setup/status", "/api/ping"):
         return None
     return jsonify({"error": "Setup required", "setup_required": True}), 503
 
@@ -511,6 +553,8 @@ def run_setup():
     session.clear()
     return jsonify({"status": "ok"})
 
+MAX_CONFIG_SIZE = 1024 * 100  # 100KB
+
 @app.route("/api/config", methods=["GET", "POST"])
 @limiter.limit("10 per minute")
 @auth_required
@@ -525,6 +569,8 @@ def api_config():
     try:
         if not csrf_is_valid():
             return jsonify({"error": "CSRF token missing or invalid"}), 403
+        if request.content_length is not None and request.content_length > MAX_CONFIG_SIZE:
+            return jsonify({"error": "Payload too large"}), 413
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data"}), 400
@@ -532,13 +578,23 @@ def api_config():
         connections = data.get("connections", [])
         if not isinstance(servers, list) or not isinstance(connections, list):
             return jsonify({"error": "Invalid data"}), 400
-        for s in servers:
-            if not isinstance(s.get("name"), str) or not s.get("name").strip():
+        for i, s in enumerate(servers):
+            if not isinstance(s.get("name"), str) or not s.get("name", "").strip():
                 return jsonify({"error": "Each server must have a name"}), 400
             if not validate_host(s.get("host", "")):
-                return jsonify({"error": f"Invalid host for server '{s.get('name', '')}'"}), 400
-        with open(SERVERS_FILE, "w", encoding="utf-8") as f:
-            json.dump({"servers": servers, "connections": connections}, f, indent=2, ensure_ascii=False)
+                return jsonify({"error": f"Server {i}: invalid host"}), 400
+        cfg_dir = os.path.dirname(SERVERS_FILE) or "."
+        fd, tmp_path = tempfile.mkstemp(suffix=".json", dir=cfg_dir)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump({"servers": servers, "connections": connections}, f, indent=2, ensure_ascii=False)
+            shutil.move(tmp_path, SERVERS_FILE)
+        except Exception as e:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise e
         reload_config()
         security_log("CONFIG_CHANGED")
         return jsonify({"status": "ok", "message": "Config saved"})
@@ -616,6 +672,36 @@ def logout():
     return jsonify({"status": "ok"})
 
 
+@app.before_request
+def set_session_secure_from_proxy():
+    """When behind proxy with HTTPS, use secure cookie (no TRUST_PROXY env needed)."""
+    try:
+        if _behind_proxy() and getattr(request, "is_secure", False):
+            app.config["SESSION_COOKIE_SECURE"] = True
+    except Exception:
+        pass
+
+
+@app.after_request
+def add_cors_when_proxy(response):
+    """When behind reverse proxy, allow CORS for origin derived from X-Forwarded-*."""
+    try:
+        if not _behind_proxy() or not getattr(request, "origin", None):
+            return response
+        scheme = getattr(request, "scheme", "http")
+        host = getattr(request, "host", None)
+        if not host:
+            return response
+        expected = f"{scheme}://{host}".rstrip("/")
+        origin = (request.origin or "").rstrip("/")
+        if origin and origin == expected:
+            response.headers["Access-Control-Allow-Origin"] = request.origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+    except Exception:
+        pass
+    return response
+
+
 @app.after_request
 def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -634,14 +720,16 @@ def add_security_headers(response):
         "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: https://*.arcgisonline.com https://*.openstreetmap.org; "
-        "connect-src 'self'; "
+        "connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net; "
         "frame-ancestors 'none';"
     )
     return response
 
+# Start monitor loop (needed for both gunicorn and dev server)
+_monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
+_monitor_thread.start()
+
 if __name__ == "__main__":
-    t = threading.Thread(target=monitor_loop, daemon=True)
-    t.start()
     print("NetWatch running on port 5000")
     print("Open: http://localhost:5000")
     if SETUP_REQUIRED:

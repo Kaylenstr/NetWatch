@@ -521,11 +521,13 @@ header {
 .login-overlay {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  z-index: 1100;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(11, 15, 20, 0.8);
+  background: rgba(11, 15, 20, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 .login-overlay.hidden { display: none; }
 .login-modal {
@@ -824,7 +826,7 @@ header {
 <script>
 (async function() {
 async function getSetupStatus() {
-  const apiUrl = window.location.protocol === 'file:' ? 'http://localhost:5000' : '';
+  const apiUrl = '';
   const r = await fetch(apiUrl + '/api/setup/status', { cache: 'no-store' });
   if (!r.ok) return { setup_required: false };
   return r.json();
@@ -855,7 +857,7 @@ function showSetupWizard() {
   const submit = document.getElementById('setup-submit');
   const msg = document.getElementById('setup-msg');
   const strength = document.getElementById('setup-strength');
-  const apiUrl = window.location.protocol === 'file:' ? 'http://localhost:5000' : '';
+  const apiUrl = '';
 
   function setMessage(text, type = '') {
     msg.textContent = text;
@@ -931,7 +933,7 @@ try {
 } catch {}
 
 const CONFIG = {
-  apiUrl: window.location.protocol === 'file:' ? 'http://localhost:5000' : '',
+  apiUrl: '',
   refreshMs: 10000,
   colors: {
     proxy:  '#3b82f6',
@@ -1044,6 +1046,12 @@ function fmt(val, dec = 1) {
 function updateSidebar(metrics) {
   const list = document.getElementById('server-list');
   const count = serverOrder.length;
+  const currentNames = new Set(serverOrder);
+
+  Array.from(list.querySelectorAll('.srv-card')).forEach((card) => {
+    const name = card.id?.replace('srv-', '');
+    if (name && !currentNames.has(name)) card.remove();
+  });
 
   const sidebarWidth = count <= 4 ? 296 : count <= 6 ? 360 : count <= 8 ? 400 : 440;
   document.documentElement.style.setProperty('--sidebar-width', sidebarWidth + 'px');
@@ -1066,29 +1074,63 @@ function updateSidebar(metrics) {
 
     const publicHost = isAuthenticated ? m.host : '••••••••';
     card.style.borderLeftColor = sc;
-    card.innerHTML = `
-      <div class="srv-top">
-        <div class="srv-info">
-          <div class="srv-name">${name}</div>
-          <div class="srv-sub">${m.location || ''}${m.role ? ' · ' + m.role : ''}</div>
-          <div class="srv-sub" style="font-variant-numeric:tabular-nums">${publicHost}</div>
-        </div>
-        <span class="status-badge ${badge}">${online ? 'ONLINE' : 'OFFLINE'}</span>
-      </div>
-      <div class="srv-metrics">
-        <div>
-          <div class="metric-val" style="color:${latColor(m.latency_ms)}">
-            ${fmt(m.latency_ms)}<span class="metric-unit">ms</span>
-          </div>
-          <div class="metric-lbl">Latency</div>
-        </div>
-        <div>
-          <div class="metric-val" style="color:var(--text-muted)">
-            ${fmt(m.jitter_ms)}<span class="metric-unit">ms</span>
-          </div>
-          <div class="metric-lbl">Jitter</div>
-        </div>
-      </div>`;
+    card.textContent = '';
+    const srvTop = document.createElement('div');
+    srvTop.className = 'srv-top';
+    const srvInfo = document.createElement('div');
+    srvInfo.className = 'srv-info';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'srv-name';
+    nameEl.textContent = name;
+    const sub1 = document.createElement('div');
+    sub1.className = 'srv-sub';
+    sub1.textContent = (m.location || '') + (m.role ? ' · ' + m.role : '');
+    const sub2 = document.createElement('div');
+    sub2.className = 'srv-sub';
+    sub2.style.fontVariantNumeric = 'tabular-nums';
+    sub2.textContent = publicHost;
+    srvInfo.appendChild(nameEl);
+    srvInfo.appendChild(sub1);
+    srvInfo.appendChild(sub2);
+    const badgeEl = document.createElement('span');
+    badgeEl.className = 'status-badge ' + badge;
+    badgeEl.textContent = online ? 'ONLINE' : 'OFFLINE';
+    srvTop.appendChild(srvInfo);
+    srvTop.appendChild(badgeEl);
+    const srvMetrics = document.createElement('div');
+    srvMetrics.className = 'srv-metrics';
+    const latDiv = document.createElement('div');
+    const latVal = document.createElement('div');
+    latVal.className = 'metric-val';
+    latVal.style.color = latColor(m.latency_ms);
+    latVal.appendChild(document.createTextNode(fmt(m.latency_ms)));
+    const latUnit = document.createElement('span');
+    latUnit.className = 'metric-unit';
+    latUnit.textContent = 'ms';
+    latVal.appendChild(latUnit);
+    const latLbl = document.createElement('div');
+    latLbl.className = 'metric-lbl';
+    latLbl.textContent = 'Latency';
+    latDiv.appendChild(latVal);
+    latDiv.appendChild(latLbl);
+    const jitDiv = document.createElement('div');
+    const jitVal = document.createElement('div');
+    jitVal.className = 'metric-val';
+    jitVal.style.color = 'var(--text-muted)';
+    jitVal.appendChild(document.createTextNode(fmt(m.jitter_ms)));
+    const jitUnit = document.createElement('span');
+    jitUnit.className = 'metric-unit';
+    jitUnit.textContent = 'ms';
+    jitVal.appendChild(jitUnit);
+    const jitLbl = document.createElement('div');
+    jitLbl.className = 'metric-lbl';
+    jitLbl.textContent = 'Jitter';
+    jitDiv.appendChild(jitVal);
+    jitDiv.appendChild(jitLbl);
+    srvMetrics.appendChild(latDiv);
+    srvMetrics.appendChild(jitDiv);
+    card.appendChild(srvTop);
+    card.appendChild(srvMetrics);
   });
 }
 
@@ -1150,34 +1192,41 @@ function makeMarkerIcon(m) {
   return L.divIcon({ html, className:'', iconSize:[12,12], iconAnchor:[6,6], popupAnchor:[0,-14] });
 }
 
+function esc(s) {
+  if (s == null || s === undefined) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
 function makePopup(name, m) {
   const dot = statusColor(m);
   const publicHost = isAuthenticated ? m.host : '••••••••';
+  const rolePart = m.role ? `<span style="font-size:10px;color:var(--text-muted);font-weight:500">${esc(m.role)}</span>` : '';
   return `<div style="font-family:Inter,sans-serif;min-width:200px">
     <div class="popup-name">
-      <span class="popup-dot" style="background:${dot}"></span>${name}
-      ${m.role ? `<span style="font-size:10px;color:var(--text-muted);font-weight:500">${m.role}</span>` : ''}
+      <span class="popup-dot" style="background:${dot}"></span>${esc(name)}
+      ${rolePart}
     </div>
     <div class="popup-grid">
-      <span class="popup-key">Host</span><span class="popup-val">${publicHost}</span>
-      <span class="popup-key">Location</span><span class="popup-val">${m.location || '—'}</span>
+      <span class="popup-key">Host</span><span class="popup-val">${esc(publicHost)}</span>
+      <span class="popup-key">Location</span><span class="popup-val">${esc(m.location || '—')}</span>
       <span class="popup-key">Status</span>
         <span class="popup-val" style="color:${m.online ? 'var(--green)':'var(--red)'}">
           ${m.online ? 'ONLINE' : 'OFFLINE'}
         </span>
       <span class="popup-key">Latency</span><span class="popup-val">${fmt(m.latency_ms)} ms</span>
       <span class="popup-key">Jitter</span><span class="popup-val">${fmt(m.jitter_ms)} ms</span>
-      <span class="popup-key">Last check</span><span class="popup-val">${m.last_checked || '—'}</span>
+      <span class="popup-key">Last check</span><span class="popup-val">${esc(m.last_checked || '—')}</span>
     </div>
   </div>`;
 }
 
 function updateMarkers(metrics) {
   const bounds = [];
+  const currentNames = new Set(Object.keys(metrics));
   Object.entries(metrics).forEach(([name, m]) => {
     if (!m.lat || !m.lon) return;
     const icon = makeMarkerIcon(m);
-    const sc   = statusColor(m);
     bounds.push([m.lat, m.lon]);
 
     if (leafletMarkers[name]) {
@@ -1188,7 +1237,13 @@ function updateMarkers(metrics) {
         .bindPopup(makePopup(name, m), { maxWidth: 260, className: '' })
         .addTo(map);
     }
+  });
 
+  Object.keys(leafletMarkers).forEach((name) => {
+    if (!currentNames.has(name)) {
+      map.removeLayer(leafletMarkers[name]);
+      delete leafletMarkers[name];
+    }
   });
 
   if (firstLoad && bounds.length > 1) {
@@ -1273,15 +1328,13 @@ function initCharts(history) {
 
 function updateCharts(history) {
   if (!latChart || !jitterChart) return;
-  const labels = history[serverOrder.find(n => history[n])]?.timestamps ?? [];
+  const namesWithHistory = serverOrder.filter(n => history[n]);
+  const labels = history[namesWithHistory[0]]?.timestamps ?? [];
 
   [latChart, jitterChart].forEach((chart, ci) => {
     const key = ci === 0 ? 'latency' : 'jitter';
     chart.data.labels = labels;
-    chart.data.datasets.forEach((ds, i) => {
-      const name = serverOrder.filter(n => history[n])[i];
-      ds.data = history[name]?.[key] ?? [];
-    });
+    chart.data.datasets = buildDatasets(history, key, ci === 0);
     chart.update('none');
   });
 }
@@ -1405,9 +1458,7 @@ const pingVis = (function() {
       if (name === hubName) return;
       const px = serverToPixel(name, metrics);
       if (!px) return;
-      const ctrl = ctrlPoint(hubPx, px);
       trails.push({
-        from: {...hubPx}, to: {...px}, ctrl,
         type: 'ping', server: name,
         progress: 0, opacity: 1, state: 'flying'
       });
@@ -1459,7 +1510,11 @@ const pingVis = (function() {
     });
 
     trails = trails.filter(t => {
-      const from = t.from, to = t.to, ctrl = t.ctrl;
+      const fromPx = t.type === 'ping' ? hubPx : serverToPixel(t.server, metrics);
+      const toPx   = t.type === 'ping' ? serverToPixel(t.server, metrics) : hubPx;
+      if (!fromPx || !toPx) return true;
+      const ctrl = ctrlPoint(fromPx, toPx);
+
       if (t.state === 'flying') {
         t.progress += TRAIL_SPEED;
         if (t.progress >= 1) {
@@ -1469,15 +1524,10 @@ const pingVis = (function() {
       }
       if (t.state === 'arrived') {
         if (t.type === 'ping' && metrics[t.server]?.online) {
-          const srvPx = serverToPixel(t.server, metrics);
-          if (srvPx && hubPx) {
-            const pongCtrl = ctrlPoint(srvPx, hubPx);
-            trails.push({
-              from: {...srvPx}, to: {...hubPx}, ctrl: pongCtrl,
-              type: 'pong', server: t.server,
-              progress: 0, opacity: 1, state: 'flying'
-            });
-          }
+          trails.push({
+            type: 'pong', server: t.server,
+            progress: 0, opacity: 1, state: 'flying'
+          });
         }
         t.state = 'fading';
       }
@@ -1488,10 +1538,10 @@ const pingVis = (function() {
 
       const color = t.type === 'ping' ? PING_COLOR : PONG_COLOR;
       const w = t.type === 'ping' ? 2.5 : 2;
-      drawArc(from, ctrl, to, Math.min(t.progress, 1), color, w, t.opacity * 0.6);
+      drawArc(fromPx, ctrl, toPx, Math.min(t.progress, 1), color, w, t.opacity * 0.6);
 
       if (t.state === 'flying') {
-        const hp = bezier(t.progress, from, ctrl, to);
+        const hp = bezier(t.progress, fromPx, ctrl, toPx);
         drawHead(hp, color, t.opacity);
       }
       return true;
@@ -1697,7 +1747,7 @@ setInterval(refresh, CONFIG.refreshMs);
         const authed = await checkAuthStatus();
         if (runId !== routeRunId) return;
         if (!authed) {
-          document.getElementById('dashboard').style.display = 'none';
+          document.getElementById('dashboard').style.display = 'grid';
           document.getElementById('settings-page').classList.remove('visible');
           nav.href = '#/';
           nav.textContent = 'Home';
